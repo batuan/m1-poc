@@ -1,7 +1,5 @@
 // -*- coding: utf-8 -*-
-
-package tpB;
-import java.util.ArrayList;
+package tpB1;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -22,39 +20,48 @@ public class SeptNains {
         for(int i = 0; i < nbNains; i++) nain[i] = new Nain(noms[i],bn);
         for(int i = 0; i < nbNains; i++) nain[i].start();
 
+        // Attendre 5 secondes
         try {
             Thread.sleep(5000);
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        } catch (InterruptedException e) {
+            System.err.println(e.getMessage());
         } finally {
-            for(int i = 0; i < nbNains; i++) nain[i].interrupt();
-        }
-
-        for(int i = 0; i < nbNains; i++) {
-            try {
+            // Interruption tous les nains.
+            System.out.println("[" + sdf.format(new Date(System.currentTimeMillis())) + "] " +"Interruption des 7 nains.");
+            for(int i = 0; i < nbNains; i++) {
+                nain[i].interrupt();
+            }
+            for(int i = 0; i < nbNains; i++) {
                 nain[i].join();
-            } catch(InterruptedException e) {
-                System.out.println("[" + noms[i] + "] Erreur dans le join : " + e.getMessage());
             }
         }
+
+        // Afficher l'heure et le message de fin
+        System.out.println("[" + sdf.format(new Date(System.currentTimeMillis())) + "] Tous les nains ont terminé.");
 
     }
 }
 
 class BlancheNeige {
-    private final BlockingQueue<Nain> fileAttente =  new ArrayBlockingQueue<Nain>(7) ;
     private volatile boolean libre = true;        // Initialement, Blanche-Neige est libre.
+    // File d'attente des nains.
+    // Ref: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/BlockingQueue.html
+    private final BlockingQueue<Nain> fileAttente =  new ArrayBlockingQueue<Nain>(7) ;
+
     public synchronized void requérir () {
+        //Lorsque le nain fait une "requérir", la file d'attente ajoute le nain
         Nain currentThread = (Nain) Thread.currentThread();
-        fileAttente.add(currentThread);
+        fileAttente.add(currentThread) ;
         System.out.println("\t" + currentThread.getName()
                 + " veut la ressource.");
     }
 
-    public synchronized void accéder () throws InterruptedException {
+    public synchronized void accéder() throws InterruptedException{
         Nain currentThread = (Nain) Thread.currentThread();
+        // Vérifiez si le nain a la liberté et son ordre dans la file d'attente
+        // méthode peek() retourner la head de file d'anntente
         while ( ! libre || !currentThread.equals(fileAttente.peek())) {
-                wait();                    // Le nain s'endort sur l'objet bn
+            wait(); // Le nain s'endort sur l'objet bn
         }
         libre = false;
         System.out.println("\t" + Thread.currentThread().getName()
@@ -65,6 +72,7 @@ class BlancheNeige {
         System.out.println("\t" + Thread.currentThread().getName()
                 + " relâche la ressource.");
         libre = true;
+        //remove head de file d'atente
         fileAttente.poll();
         notifyAll();
     }
@@ -76,20 +84,34 @@ class Nain extends Thread {
         this.setName(nom);
         this.bn = bn;
     }
+
+    static private SimpleDateFormat sdf = new SimpleDateFormat("hh'h 'mm'mn 'ss','SSS's'");
+
     public void run() {
+        // si le nain n'est interrompus, lui permettre un accès à la ressource
         while(!isInterrupted()) {
             try {
                 bn.requérir();
                 bn.accéder();
-                System.out.println(getName() + " a un accès (exclusif) à Blanche-Neige.");
-                sleep(2000);
-                System.out.println(getName() + " s'apprête à quitter Blanche-Neige.");
-                bn.relâcher();
-            } catch (InterruptedException ex) {
+                System.out.println("[" + sdf.format(new Date(System.currentTimeMillis())) + "] "
+                                     + getName() + " a un accès (exclusif) à Blanche-Neige.");
+                try {
+                    sleep(2000);
+                } catch (InterruptedException e) {
+                    this.interrupt();
+                } finally {
+                    System.out.println("[" + sdf.format(new Date(System.currentTimeMillis())) + "] "
+                                        + getName() + " s'apprête à quitter Blanche-Neige.");
+                    bn.relâcher();
+                }
+            } catch (InterruptedException exception) {
                 this.interrupt();
             }
         }
-        System.out.println(getName() + " a terminé!");
+
+        // le nain est interrompus, afficher la terminer et le temp
+        System.out.println("[" + sdf.format(new Date(System.currentTimeMillis())) + "] "
+                             + getName() + " a terminé!");
     }
 }
 
